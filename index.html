@@ -1,0 +1,1343 @@
+<!DOCTYPE html>
+<html lang="ms" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>AR Cowboy Tajwid — Misi Mad Silah Tawilah</title>
+  
+  <!-- Fonts Integration -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=Noto+Sans+Arabic:wght@400;600;700&family=Outfit:wght@400;600;700;800&family=Rye&display=swap" rel="stylesheet">
+  
+  <!-- MediaPipe Hands & Camera Utils CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+  <!-- Canvas Confetti CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <style>
+    :root {
+      --primary-wood: #3d2314;
+      --secondary-gold: #f39c12;
+      --paper-bg: #f5e9be;
+      --paper-border: #8c6239;
+      --accent-cyan: #00e5ff;
+      --accent-red: #d32f2f;
+      --accent-green: #2e7d32;
+      --dark-text: #2c1d11;
+      --card-shadow: 0 8px 18px rgba(0,0,0,0.4);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      font-family: 'Outfit', sans-serif;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #1a0f07;
+      color: var(--dark-text);
+    }
+
+    /* Main Container */
+    #app-container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      background: radial-gradient(circle, #2a180b 0%, #120904 100%);
+    }
+
+    /* Video Feed Hidden Element & Pip Camera Overlay */
+    #webcam-video {
+      display: none;
+    }
+
+    #pip-camera-container {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      width: 180px;
+      height: 135px;
+      z-index: 50;
+      border-radius: 12px;
+      border: 3px solid #ffffff;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.6);
+      overflow: hidden;
+      background: #000;
+      display: flex;
+      flex-direction: column;
+    }
+
+    @media (max-width: 768px) {
+      #pip-camera-container {
+        width: 25vw;
+        height: 18vw;
+        top: 10px;
+        right: 10px;
+      }
+    }
+
+    #pip-video-preview {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1);
+    }
+
+    .pip-badge {
+      position: absolute;
+      bottom: 4px;
+      left: 4px;
+      background: rgba(0,0,0,0.75);
+      color: #fff;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      border: 1px solid rgba(255,255,255,0.3);
+    }
+
+    /* Fullscreen AR Canvas for Crosshair & Reticle Overlay */
+    #ar-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 40;
+      pointer-events: none;
+    }
+
+    /* Western Background Decor Overlay */
+    .western-bg-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      background: radial-gradient(circle, rgba(0,0,0,0.1) 0%, rgba(18, 9, 4, 0.7) 100%);
+      pointer-events: none;
+    }
+
+    /* Header Bar */
+    #game-header {
+      position: relative;
+      z-index: 10;
+      padding: 10px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: linear-gradient(180deg, rgba(61, 35, 20, 0.95) 0%, rgba(30, 16, 9, 0.85) 100%);
+      border-bottom: 3px solid var(--secondary-gold);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    }
+
+    .brand-title-box {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .sheriff-badge-icon {
+      width: 42px;
+      height: 42px;
+      background: var(--secondary-gold);
+      clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      box-shadow: inset 0 0 5px #7f4f04;
+    }
+
+    .round-title-text {
+      font-family: 'Rye', cursive;
+      font-size: 1.05rem;
+      color: #ffd700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .badge-name-text {
+      font-size: 0.85rem;
+      color: #fff;
+      font-weight: 600;
+    }
+
+    .stats-container {
+      display: flex;
+      gap: 15px;
+      align-items: center;
+      margin-right: 190px;
+    }
+
+    @media (max-width: 768px) {
+      .stats-container {
+        margin-right: 28vw;
+        gap: 8px;
+      }
+    }
+
+    .stat-pill {
+      background: rgba(0,0,0,0.6);
+      padding: 5px 12px;
+      border-radius: 20px;
+      border: 1px solid var(--secondary-gold);
+      color: #fff;
+      font-size: 0.85rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .combo-badge {
+      background: #e67e22;
+      color: #fff;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.8rem;
+      font-weight: 800;
+      animation: pulse 1s infinite alternate;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      100% { transform: scale(1.08); }
+    }
+
+    /* Main Stage */
+    #game-stage {
+      position: relative;
+      z-index: 10;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 10px 20px 60px 20px;
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* Question Box */
+    .question-card {
+      background: #f5e9be;
+      border: 4px solid var(--primary-wood);
+      border-radius: 14px;
+      padding: 14px 20px;
+      text-align: center;
+      box-shadow: var(--card-shadow);
+      width: 100%;
+      margin-top: 5px;
+      position: relative;
+    }
+
+    .q-counter-lbl {
+      font-size: 0.8rem;
+      font-weight: 800;
+      color: var(--paper-border);
+      letter-spacing: 1.5px;
+      margin-bottom: 2px;
+      text-transform: uppercase;
+    }
+
+    .q-text-lbl {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--dark-text);
+      line-height: 1.4;
+      margin-bottom: 6px;
+    }
+
+    .arabic-text-box {
+      font-family: 'Amiri', serif;
+      font-size: 2.1rem;
+      font-weight: 700;
+      color: #000;
+      direction: rtl;
+      unicode-bidi: isolate;
+      line-height: 1.5;
+      background: rgba(255,255,255,0.5);
+      padding: 4px 16px;
+      border-radius: 8px;
+      border: 1px dashed var(--primary-wood);
+      display: inline-block;
+      margin-top: 4px;
+    }
+
+    /* Answers Wanted Grid */
+    .answers-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    .wanted-card {
+      background: #edd8a8;
+      border: 3px solid #5c3a1e;
+      border-radius: 12px;
+      padding: 12px;
+      position: relative;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.2s, background-color 0.2s;
+      box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100px;
+      text-align: center;
+    }
+
+    .wanted-card::before {
+      content: "★ WANTED ★";
+      font-family: 'Rye', cursive;
+      font-size: 0.7rem;
+      letter-spacing: 1.5px;
+      color: #8c2a1c;
+      margin-bottom: 4px;
+    }
+
+    .wanted-card.locked-target {
+      border-color: var(--accent-cyan) !important;
+      background: #fff8dc !important;
+      box-shadow: 0 0 25px rgba(0, 229, 255, 0.9) !important;
+      transform: scale(1.03);
+    }
+
+    .wanted-card.correct {
+      background: #81c784 !important;
+      border-color: #2e7d32 !important;
+      color: #0d3810 !important;
+      animation: pop 0.3s ease;
+    }
+
+    .wanted-card.wrong {
+      background: #e57373 !important;
+      border-color: #c62828 !important;
+      color: #4c0000 !important;
+    }
+
+    @keyframes pop {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+
+    .opt-badge {
+      position: absolute;
+      top: 8px;
+      left: 10px;
+      background: var(--primary-wood);
+      color: #fff;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.8rem;
+    }
+
+    .ans-text-content {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #2c1d11;
+      line-height: 1.3;
+    }
+
+    .ans-arabic-content {
+      font-family: 'Amiri', serif;
+      font-size: 1.6rem;
+      font-weight: 700;
+      direction: rtl;
+      unicode-bidi: isolate;
+      line-height: 1.3;
+    }
+
+    /* Bottom HUD Gesture Banner */
+    #gesture-hud-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 48px;
+      background: rgba(18, 9, 4, 0.92);
+      border-top: 2px solid var(--secondary-gold);
+      z-index: 30;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 20px;
+      color: #fff;
+      font-size: 0.82rem;
+      font-weight: 600;
+      padding: 0 15px;
+    }
+
+    .hud-step {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .hud-step.active {
+      color: var(--accent-cyan);
+      text-shadow: 0 0 8px var(--accent-cyan);
+    }
+
+    /* Modals & Overlays */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(10, 5, 2, 0.9);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      backdrop-filter: blur(4px);
+    }
+
+    .modal-box {
+      background: #f5e9be;
+      border: 5px solid var(--primary-wood);
+      border-radius: 16px;
+      padding: 25px 30px;
+      max-width: 560px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.8);
+    }
+
+    .modal-title {
+      font-family: 'Rye', cursive;
+      font-size: 1.8rem;
+      color: #8c2a1c;
+      margin-bottom: 6px;
+    }
+
+    .modal-subtitle {
+      font-family: 'Amiri', serif;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--primary-wood);
+      margin-bottom: 12px;
+      direction: rtl;
+    }
+
+    .modal-desc {
+      font-size: 0.9rem;
+      color: #4a3525;
+      margin-bottom: 16px;
+      line-height: 1.45;
+    }
+
+    .guide-box {
+      background: rgba(0,0,0,0.06);
+      border-radius: 10px;
+      padding: 12px 16px;
+      text-align: left;
+      margin-bottom: 20px;
+      font-size: 0.85rem;
+    }
+
+    .guide-box div {
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-cowboy {
+      background: linear-gradient(180deg, #f39c12 0%, #d35400 100%);
+      color: #fff;
+      border: 2px solid #fff;
+      padding: 10px 24px;
+      font-size: 1.05rem;
+      font-weight: 800;
+      border-radius: 25px;
+      cursor: pointer;
+      box-shadow: 0 5px 0 #8e3800, 0 8px 15px rgba(0,0,0,0.4);
+      transition: all 0.1s ease;
+      display: inline-block;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .btn-cowboy:active {
+      transform: translateY(3px);
+      box-shadow: 0 2px 0 #8e3800, 0 4px 8px rgba(0,0,0,0.4);
+    }
+
+    .btn-secondary {
+      background: #5c3a1e;
+      box-shadow: 0 5px 0 #2a180b;
+      margin-top: 8px;
+    }
+
+    .stars-container {
+      font-size: 2.8rem;
+      margin: 12px 0;
+      color: #d1d5db;
+    }
+
+    .stars-container .gold {
+      color: #f59e0b;
+      text-shadow: 0 0 10px rgba(245, 158, 11, 0.6);
+    }
+
+    .stats-summary {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin: 15px 0;
+    }
+
+    .summary-card {
+      background: rgba(0,0,0,0.05);
+      padding: 8px;
+      border-radius: 8px;
+      border: 1px solid #d4c096;
+    }
+
+    .summary-card label {
+      font-size: 0.72rem;
+      color: #7c5c43;
+      display: block;
+      font-weight: 700;
+    }
+
+    .summary-card val {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--primary-wood);
+    }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <div id="app-container">
+    <!-- MediaPipe Camera Source -->
+    <video id="webcam-video" playsinline></video>
+
+    <!-- Picture-in-Picture Mirror Video Overlay -->
+    <div id="pip-camera-container">
+      <video id="pip-video-preview" autoplay playsinline muted></video>
+      <div class="pip-badge">
+        <span>📹 ANDA</span>
+        <span id="ar-status-dot" style="width:6px;height:6px;border-radius:50%;background:#888;"></span>
+      </div>
+    </div>
+    
+    <!-- AR Canvas Overlay for Reticle Crosshair -->
+    <canvas id="ar-canvas"></canvas>
+    
+    <div class="western-bg-overlay"></div>
+
+    <!-- Header UI -->
+    <header id="game-header">
+      <div class="brand-title-box">
+        <div class="sheriff-badge-icon">⭐</div>
+        <div>
+          <div class="round-title-text" id="round-title">PUSINGAN 1</div>
+          <div class="badge-name-text" id="badge-name">🎯 KENALI MAD SILAH TAWILAH</div>
+        </div>
+      </div>
+
+      <div class="stats-container">
+        <div class="stat-pill">
+          <span>🎯 SKOR:</span>
+          <span id="score-val">0</span>
+        </div>
+        <div class="combo-badge" id="combo-box">
+          🔥 COMBO x1
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Stage Area -->
+    <main id="game-stage">
+      <!-- Question Board -->
+      <div class="question-card">
+        <div class="q-counter-lbl" id="q-counter">SOALAN 1 / 18</div>
+        <div class="q-text-lbl" id="q-text">Loading Question...</div>
+        <div class="arabic-text-box hidden" id="arabic-box"></div>
+      </div>
+
+      <!-- Answer Options Grid -->
+      <div class="answers-grid" id="answers-grid">
+        <!-- 4 Wanted Cards Injected Here -->
+      </div>
+    </main>
+
+    <!-- Bottom HUD Gesture Guide -->
+    <footer id="gesture-hud-bar">
+      <div class="hud-step" id="hud-aim">
+        <span>☝️️</span> <span>1. AIM TELUNJUK</span>
+      </div>
+      <span>➔</span>
+      <div class="hud-step" id="hud-lock">
+        <span>🎯</span> <span>2. SASARAN DIKUNCI</span>
+      </div>
+      <span>➔</span>
+      <div class="hud-step" id="hud-fire">
+        <span>✋</span> <span>3. BUKA TAPAK TANGAN (SELECT)</span>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Start Modal -->
+  <div class="modal-overlay" id="start-modal">
+    <div class="modal-box">
+      <div class="modal-title">🤠 AR COWBOY TAJWID</div>
+      <div class="modal-subtitle">مَدُّ الصِّلَةِ الطَّوِيلَةِ — Misi Mad Silah Tawilah</div>
+      <p class="modal-desc">
+        Selamat datang Cowboy Tajwid! Sertai misi menembak jawapan tajwid yang betul bagi hukum <strong>Mad Silah Tawilah</strong>!
+      </p>
+
+      <div class="guide-box">
+        <div>☝️ <strong>1. AIM:</strong> Arahkan jari telunjuk untuk mengawal crosshair.</div>
+        <div>🎯 <strong>2. LOCK:</strong> Letakkan crosshair di atas jawapan sehingga sasaran dikunci.</div>
+        <div>✋ <strong>3. FIRE:</strong> Buka tapak tangan untuk memilih jawapan!</div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:10px; align-items:center;">
+        <button class="btn-cowboy" id="btn-start-ar">🚀 MAIN DENGAN KAMERA (AR)</button>
+        <button class="btn-cowboy btn-secondary" id="btn-start-mouse">🖱️ MAIN TANPA KAMERA (TETIKUS/SENTUH)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Victory Modal -->
+  <div class="modal-overlay hidden" id="win-modal">
+    <div class="modal-box">
+      <div class="modal-title">🎉 TAHNIAH, COWBOY!</div>
+      <p style="font-weight: 700; color: #8c2a1c;">Anda Berjaya Menamatkan Misi Mad Silah Tawilah!</p>
+
+      <div class="stars-container" id="stars-box">
+        <span class="star">★</span>
+        <span class="star">★</span>
+        <span class="star">★</span>
+      </div>
+
+      <div class="stats-summary">
+        <div class="summary-card">
+          <label>JUMLAH BOUNTY</label>
+          <val id="res-score">0</val>
+        </div>
+        <div class="summary-card">
+          <label>JAWAPAN BETUL</label>
+          <val id="res-correct">0 / 18</val>
+        </div>
+        <div class="summary-card">
+          <label>COMBO TERTINGGI</label>
+          <val id="res-combo">x1</val>
+        </div>
+        <div class="summary-card">
+          <label>KADAR KETEPATAN</label>
+          <val id="res-accuracy">0%</val>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:10px; justify-content:center;">
+        <button class="btn-cowboy" id="btn-restart">🔄 MAIN SEMULA</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* ==========================================
+       1. DATA SOALAN TAJWID (18 SOALAN COMPLETE)
+       ========================================== */
+    const QUESTIONS_DATA = [
+      // PUSINGAN 1: Kenali Mad Silah Tawilah (1-4)
+      {
+        round: 1,
+        badge: "🎯 کنلي مد صلة طويلة ",
+        q: " اڤاکه مقصود مد صلة طويلة ؟ ",
+        arabic: "",
+        options: [
+          { text: "ممنجڠکن باچاءن هاء ضمير اڤابيلا برتمو همزة سلڤسڽ", correct: true },
+          { text: "ممنجڠکن حروف مد اڤابيلا برتمو سوکون اصلي", correct: false },
+          { text: "ممنجڠکن باچاءن هاء  ضمير اڤابيلا برتمو حروف سلاءين همزة", correct: false },
+          { text: "ممينديقکن باچاءن حروف هاء ڤد اخير ايات", correct: false }
+        ]
+      },
+      {
+        round: 1,
+        badge: "🎯 کنلي مد صلة طويلة ",
+        q: " براڤکه قدر ڤنجڠ باچاءن باݢي مد صلة طويلة ؟",
+        arabic: "",
+        options: [
+          { text: " امڤت اتاو ليم حرکة ", correct: true },
+          { text: "دوا حرکة سهاج", correct: false },
+          { text: "انم حرکة ", correct: false },
+          { text: "ساتو حرکة سهاج", correct: false }
+        ]
+      },
+      {
+        round: 1,
+        badge: "🎯  کنلي مد صلة طويلة ",
+        q: " اڤاکه شرط اوتام يڠ مڽببکن مد صلة منجادي طويلة ؟ ",
+        arabic: "",
+        options: [
+          { text: " ترداڤت حروف همزة سلڤس هاء ضمير ", correct: true },
+          { text: "ترداڤت حروف ياء سلڤس هاء ضمير ", correct: false },
+          { text: "هاء ضمير براد داول سورة ", correct: false },
+          { text: " ترداڤت تندا سوکون داتس هاء ضمير ", correct: false }
+        ]
+      },
+      {
+        round: 1,
+        badge: "🎯 کنلي مد صلة طويلة ",
+        q: "  انتارا برايکوت ماناکه شرط کدودوقن هاء ضمير دالم مد صلة صيلة ؟ ",
+        arabic: "",
+        options: [
+          { text: "براد دانتارا دوا حروف يڠ برباريس", correct: true },
+          { text: "براد دانتارا دوا حروف يڠ ماتي (سوکون)", correct: false },
+          { text: "مستي براد داخير سورة سهاج", correct: false },
+          { text: "دأيکوتي اوليه حروف قلقلة", correct: false }
+        ]
+      },
+
+      // PUSINGAN 2: Kenali هَاءُ الضَّمِير (5-8)
+      {
+        round: 2,
+        badge: "🔎 کنلي هاء ضمير ",
+        q: "اڤاکه حکوم تجويد ڤد هُ دالم چونتوه برايکوت ؟",
+        arabic: "مَالَهُ أَخْلَدَهُ",
+        options: [
+          { text: " مد صلة طويلة ", correct: true },
+          { text: "مد صلة قصيرة", correct: false },
+          { text: "مد جائز منفصل", correct: false },
+          { text: "مد اصلي", correct: false }
+        ]
+      },
+      {
+        round: 2,
+        badge: "🔎 کنلي هاء ضمير ",
+        q: "ماناکه انتارا برايکوت مڠاندوڠي باچاءن مد صلة طويلة ؟ ",
+        arabic: "",
+        options: [
+          { text: "دُونِهِ أَوْلِيَاءَ", correct: true },
+          { text: "بِهِ بَصِيرًا", correct: false },
+          { text: "إِنَّهُ كَانَ", correct: false },
+          { text: "لَهُ مَا فِي السَّمَاوَاتِ", correct: false }
+        ]
+      },
+      {
+        round: 2,
+        badge: "🔎 کنلي هاء ضمير ",
+        q: "اڤاکه حکوم تجويد باݢي ڤرکاتاءن برايکوت ؟ ",
+        arabic: "عِنْدَهُ إِلَّا",
+        options: [
+          { text: "مد صلة طويلة", correct: true },
+          { text: "مد صلة قصيرة", correct: false },
+          { text: "مد بدل", correct: false },
+          { text: "مد واجب متصل", correct: false }
+        ]
+      },
+      {
+        round: 2,
+        badge: "🔎کنلي هاء ضمير ",
+        q: "مڠاڤاکه چونتوه دباوه دکيرا سباݢاي مد صلة طويلة ؟ ",
+        arabic: "عِلْمِهِ إِلَّا",
+        options: [
+          { text: "کران هاء ضمير برتمو همزة", correct: true },
+          { text: "کران ترداڤت حروف تنوين", correct: false },
+          { text: "کران دڤنجڠکن دوا حرکة", correct: false },
+          { text: "کران براد دهوجوڠ ايات", correct: false }
+        ]
+      },
+
+      // PUSINGAN 3: Cari Bacaan Mad Silah Tawilah (9-12)
+      {
+        round: 3,
+        badge: "📖 چاري باچاءن مد صلة طويلة ",
+        q: "دالم ايات اين , ماناکه بهاݢين يڠ مڠاندوڠي مد صلة طويلة ؟",
+        arabic: "مَنْ ذَا الَّذِي يَشْفَعُ عِنْدَهُ إِلَّا بِإِذْنِهِ",
+        options: [
+          { text: "عِنْدَهُ إِلَّا", correct: true },
+          { text: "بِإِذْنِهِ", correct: false },
+          { text: "يَشْفَعُ", correct: false },
+          { text: "مَنْ ذَا", correct: false }
+        ]
+      },
+      {
+        round: 3,
+        badge: "📖  چاري باچاءن مد صلة طويلة ",
+        q: "ڤيليه بهاݢين يڠ مڠاندوڠي مد صلة طويلة دالم ڤتيقن ايات الکورسي برايکوت :",
+        arabic: "وَلَا يُحِيطُونَ بِشَيْءٍ مِنْ عِلْمِهِ إِلَّا بِمَا شَاءَ",
+        options: [
+          { text: "عِلْمِهِ إِلَّا", correct: true },
+          { text: "بِشَيْءٍ مِنْ", correct: false },
+          { text: "بِمَا شَاءَ", correct: false },
+          { text: "وَلَا يُحِيطُونَ", correct: false }
+        ]
+      },
+      {
+        round: 3,
+        badge: "📖 چاري باچاءن مد صلة طويلة ",
+        q: " اڤاکه حروف يڠ ترلتق سلڤس هاء ضميردالم چونتوه دباوه ؟ ",
+        arabic: "عِلْمِهِ إِلَّا",
+        options: [
+          { text: " (ء) حروف همزة", correct: true },
+          { text: "حروف ي", correct: false },
+          { text: "حروف ب", correct: false },
+          { text: "حروف م", correct: false }
+        ]
+      },
+      {
+        round: 3,
+        badge: "📖  چاري باچاءن مد صلة طويلة ",
+        q: "ماناکه انتارا ڤادنن برايکوت يڠ بنر باݢي مد صلة طويلة ؟ ",
+        arabic: "",
+        options: [
+          { text: "مَالَهُ أَخْلَدَهُ (4/5 حرکة)", correct: true },
+          { text: "إِنَّهُ كَانَ (6 حرکة)", correct: false },
+          { text: "بِهِ يَعْلَمُ (4/5 حرکة)", correct: false },
+          { text: "دُونِهِ أَوْلِيَاءَ (1 حرکة)", correct: false }
+        ]
+      },
+
+      // PUSINGAN 4: Bezakan Betul atau Salah (13-15)
+      {
+        round: 4,
+        badge: "🧠 بيذاکن بتول اتاو ساله ",
+        q: "ڤرهاتيکن چونتوه اين : بِإِذْنِهِ يَعْلَمُ . اداکه اين مد صلة طويلة ؟",
+        arabic: "بِإِذْنِهِ يَعْلَمُ",
+        options: [
+          { text: "تيدق، کران سلڤس حاء اياله حروف ياء بوکن همزة", correct: true },
+          { text: "يا ، کران ترداڤت هاء ضمير", correct: false },
+          { text: "يا، کران دباچ امڤت حرکة", correct: false },
+          { text: "تيدق، کران حروف هاء تياد باريس", correct: false }
+        ]
+      },
+      {
+        round: 4,
+        badge: "🧠 بيذاکن بتول اتاو ساله ",
+        q: "اڤاکه ڤربيذاءن اوتام انتارا مد صلة قصيرة دان مد صلة طويلة ؟",
+        arabic: "",
+        options: [
+          { text: "طويلة برتمو همزة (4/5 حرکة), قصيرة برتمو سلاءين همزة (2 حرکة)", correct: true },
+          { text: "قصيرة دباچ 6 حرکة, طويلة دباچ 2 حرکة", correct: false },
+          { text: "طويلة تيدق ممڤوڽاءي هاء ضمير", correct: false },
+          { text: "تياد سبارڠ ڤربيذاءن", correct: false }
+        ]
+      },
+      {
+        round: 4,
+        badge: "🧠 بيذاکن بتول اتاو ساله ",
+        q: "اداکه ڤرکاتاءن 'لَهُ مَالٌ' مروڤاکن مد صلة طويلة ؟",
+        arabic: "لَهُ مَالٌ",
+        options: [
+          { text: "بوکن، کران اي تيدق برتمو دڠن حروف همزة", correct: true },
+          { text: "يا، کران اد هاء ضمير", correct: false },
+          { text: "يا، کران براد داول ايات", correct: false },
+          { text: "بوکن، کران اي دباچ 6 حرکة", correct: false }
+        ]
+      },
+
+      // PUSINGAN 5: Cabaran Tajwid Cowboy (16-18)
+      {
+        round: 5,
+        badge: "🤠 COWBOY چابرن تجويد ",
+        q: "أحمد ممباچ ايات القرءان دان منجومڤاءي هاء ضمير برتمو همزة قطع . اڤاکه تيندقن باچاءن أحمد ؟",
+        arabic: "",
+        options: [
+          { text: "ممنجڠکن باچاءن 4 اتاو 5 حرکة", correct: true },
+          { text: "ممينديقکن باچاءن منجادي 1 حرکة", correct: false },
+          { text: " (غنة) ممباچ سچارا دڠوڠ ", correct: false },
+          { text: "مواقفکن باچاءن سرتا-مرتا ", correct: false }
+        ]
+      },
+      {
+        round: 5,
+        badge: "🤠 COWBOY چابرن تجويد ",
+        q: "ماناکه انتارا برايکوت بوکن چونتوه مد صلة طويلة ؟",
+        arabic: "",
+        options: [
+          { text: "بِهِ يَعْلَمُ", correct: true },
+          { text: "مَالَهُ أَخْلَدَهُ", correct: false },
+          { text: "عِنْدَهُ إِلَّا", correct: false },
+          { text: "دُونِهِ أَوْلِيَاءَ", correct: false }
+        ]
+      },
+      {
+        round: 5,
+        badge: "🤠  COWBOY چابرن تجويد ",
+        q: "براڤاکه حرکة باچاءن اونتوق 'عِلْمِهِ إِلَّا' مڠيکوت روايت حفص عن عاصم ؟",
+        arabic: "عِلْمِهِ إِلَّا",
+        options: [
+          { text: "امڤت اتاو ليم حرکة", correct: true },
+          { text: "دوا حرکة سهاج ", correct: false },
+          { text: "انم حرکة ", correct: false },
+          { text: "تيݢ حرکة ", correct: false }
+        ]
+      }
+    ];
+
+    /* ==========================================
+       2. WEB AUDIO SYNTHESIZER ENGINE (SOUND FX)
+       ========================================== */
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioContext();
+        }
+      }
+
+      playLockDing() {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, now);
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.15);
+      }
+
+      playCorrect() {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const notes = [523.25, 659.25, 783.99, 1046.50];
+        notes.forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+          gain.gain.setValueAtTime(0, now + idx * 0.08);
+          gain.gain.linearRampToValueAtTime(0.25, now + idx * 0.08 + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.25);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now + idx * 0.08);
+          osc.stop(now + idx * 0.08 + 0.3);
+        });
+      }
+
+      playWrong() {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(160, now);
+        osc.frequency.linearRampToValueAtTime(90, now + 0.25);
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.25);
+      }
+
+      playFanfare() {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(350, now);
+        osc.frequency.exponentialRampToValueAtTime(750, now + 0.2);
+        osc.frequency.exponentialRampToValueAtTime(450, now + 0.4);
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.4);
+      }
+    }
+
+    const sound = new SoundEngine();
+
+    /* ==========================================
+       3. GAME STATE MANAGEMENT
+       ========================================== */
+    let currentQIndex = 0;
+    let score = 0;
+    let combo = 1;
+    let maxCombo = 1;
+    let correctCount = 0;
+    let shuffledQuestions = [];
+    let isAnswerLocked = false;
+    let arModeActive = false;
+
+    // Gesture State & Locking
+    let cursorX = window.innerWidth / 2;
+    let cursorY = window.innerHeight / 2;
+    let lockedTargetElement = null;
+    let lastLockedElement = null;
+    let openPalmFrameCount = 0;
+    let selectCooldown = false;
+
+    /* Elements */
+    const webcamVideo = document.getElementById('webcam-video');
+    const pipVideoPreview = document.getElementById('pip-video-preview');
+    const arCanvas = document.getElementById('ar-canvas');
+    const ctx = arCanvas.getContext('2d');
+    const arStatusDot = document.getElementById('ar-status-dot');
+
+    /* ==========================================
+       4. INITIALIZATION & HAND TRACKING
+       ========================================== */
+    function resizeCanvas() {
+      arCanvas.width = window.innerWidth;
+      arCanvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    const hands = new Hands({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+    });
+
+    hands.setOptions({
+      maxNumHands: 1,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.55,
+      minTrackingConfidence: 0.55
+    });
+
+    hands.onResults(onHandResults);
+
+    let cameraInstance = null;
+
+    function startARMode() {
+      sound.init();
+      arModeActive = true;
+      document.getElementById('start-modal').classList.add('hidden');
+      arStatusDot.style.background = '#e74c3c';
+
+      cameraInstance = new Camera(webcamVideo, {
+        onFrame: async () => {
+          await hands.send({ image: webcamVideo });
+        },
+        width: 640,
+        height: 480
+      });
+
+      cameraInstance.start().then(() => {
+        pipVideoPreview.srcObject = webcamVideo.srcObject;
+        arStatusDot.style.background = '#2ecc71';
+      }).catch(err => {
+        alert("Gagal membuka kamera. Memulakan mod tetikus.");
+        startMouseMode();
+      });
+
+      initGame();
+    }
+
+    function startMouseMode() {
+      sound.init();
+      arModeActive = false;
+      document.getElementById('start-modal').classList.add('hidden');
+      document.getElementById('pip-camera-container').classList.add('hidden');
+      document.getElementById('gesture-hud-bar').classList.add('hidden');
+
+      window.addEventListener('mousemove', (e) => {
+        cursorX = e.clientX;
+        cursorY = e.clientY;
+        checkLockTarget();
+      });
+
+      initGame();
+    }
+
+    /* Shuffle Utility */
+    function shuffleArray(arr) {
+      return arr.map(a => ({ sort: Math.random(), value: a }))
+                .sort((a, b) => a.sort - b.sort)
+                .map(a => a.value);
+    }
+
+    function initGame() {
+      currentQIndex = 0;
+      score = 0;
+      combo = 1;
+      maxCombo = 1;
+      correctCount = 0;
+      shuffledQuestions = shuffleArray(QUESTIONS_DATA);
+      updateScoreUI();
+      renderCurrentQuestion();
+      requestAnimationFrame(renderAROverlay);
+    }
+
+    /* ==========================================
+       5. QUESTION RENDER & ANSWER SELECTION
+       ========================================== */
+    function renderCurrentQuestion() {
+      if (currentQIndex >= shuffledQuestions.length) {
+        showWinScreen();
+        return;
+      }
+
+      isAnswerLocked = false;
+      const qData = shuffledQuestions[currentQIndex];
+
+      document.getElementById('round-title').innerText = `PUSINGAN ${qData.round}`;
+      document.getElementById('badge-name').innerText = qData.badge;
+      document.getElementById('q-counter').innerText = `SOALAN ${currentQIndex + 1} / ${shuffledQuestions.length}`;
+      document.getElementById('q-text').innerText = qData.q;
+
+      const arabicBox = document.getElementById('arabic-box');
+      if (qData.arabic && qData.arabic.trim() !== "") {
+        arabicBox.innerText = qData.arabic;
+        arabicBox.classList.remove('hidden');
+      } else {
+        arabicBox.classList.add('hidden');
+      }
+
+      const answersGrid = document.getElementById('answers-grid');
+      answersGrid.innerHTML = '';
+
+      const shuffledOptions = shuffleArray(qData.options);
+      const optLabels = ['A', 'B', 'C', 'D'];
+
+      shuffledOptions.forEach((opt, idx) => {
+        const card = document.createElement('div');
+        card.className = 'wanted-card';
+        card.dataset.correct = opt.correct;
+
+        const isArabicText = /[\u0600-\u06FF]/.test(opt.text);
+        card.innerHTML = `
+          <div class="opt-badge">${optLabels[idx]}</div>
+          <div class="${isArabicText ? 'ans-arabic-content' : 'ans-text-content'}">${opt.text}</div>
+        `;
+
+        card.addEventListener('click', () => {
+          if (!isAnswerLocked) {
+            handleAnswerSelection(card, opt.correct);
+          }
+        });
+
+        answersGrid.appendChild(card);
+      });
+    }
+
+    function handleAnswerSelection(cardEl, isCorrect) {
+      if (isAnswerLocked) return;
+      isAnswerLocked = true;
+
+      if (isCorrect) {
+        sound.playCorrect();
+        cardEl.classList.add('correct');
+        score += 100 * combo;
+        correctCount++;
+        combo++;
+        if (combo > maxCombo) maxCombo = combo;
+        if (typeof confetti === 'function') {
+          confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
+        }
+      } else {
+        sound.playWrong();
+        cardEl.classList.add('wrong');
+        combo = 1;
+        // Highlight correct answer
+        document.querySelectorAll('.wanted-card').forEach(c => {
+          if (c.dataset.correct === 'true') c.classList.add('correct');
+        });
+      }
+
+      updateScoreUI();
+
+      setTimeout(() => {
+        currentQIndex++;
+        renderCurrentQuestion();
+      }, 1500);
+    }
+
+    function updateScoreUI() {
+      document.getElementById('score-val').innerText = score;
+      document.getElementById('combo-box').innerText = `🔥 COMBO x${combo}`;
+    }
+
+    /* ==========================================
+       6. HAND TRACKING & AR SELECTION LOGIC
+       ========================================== */
+    function onHandResults(results) {
+      if (!arModeActive) return;
+
+      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        const landmarks = results.multiHandLandmarks[0];
+
+        // Index tip (Point 8) for cursor aim
+        const indexTip = landmarks[8];
+        cursorX = (1 - indexTip.x) * window.innerWidth;
+        cursorY = indexTip.y * window.innerHeight;
+
+        // Detect Open Palm (Index, Middle, Ring, Pinky extended)
+        const isIndexUp = landmarks[8].y < landmarks[6].y;
+        const isMiddleUp = landmarks[12].y < landmarks[10].y;
+        const isRingUp = landmarks[16].y < landmarks[14].y;
+        const isPinkyUp = landmarks[20].y < landmarks[18].y;
+
+        const isOpenPalm = isIndexUp && isMiddleUp && isRingUp && isPinkyUp;
+
+        if (isOpenPalm) {
+          openPalmFrameCount++;
+          document.getElementById('hud-fire').classList.add('active');
+        } else {
+          openPalmFrameCount = 0;
+          document.getElementById('hud-fire').classList.remove('active');
+        }
+
+        checkLockTarget();
+
+        // Trigger action on Open Palm
+        if (openPalmFrameCount >= 3 && lockedTargetElement && !selectCooldown && !isAnswerLocked) {
+          selectCooldown = true;
+          const isCorrect = lockedTargetElement.dataset.correct === 'true';
+          handleAnswerSelection(lockedTargetElement, isCorrect);
+          setTimeout(() => { selectCooldown = false; }, 1000);
+        }
+
+        document.getElementById('hud-aim').classList.add('active');
+      } else {
+        document.getElementById('hud-aim').classList.remove('active');
+        document.getElementById('hud-lock').classList.remove('active');
+        document.getElementById('hud-fire').classList.remove('active');
+      }
+    }
+
+    function checkLockTarget() {
+      const cards = document.querySelectorAll('.wanted-card');
+      let found = null;
+
+      cards.forEach(card => {
+        const rect = card.getBoundingClientRect();
+        if (cursorX >= rect.left && cursorX <= rect.right &&
+            cursorY >= rect.top && cursorY <= rect.bottom) {
+          found = card;
+        }
+      });
+
+      cards.forEach(card => card.classList.remove('locked-target'));
+
+      if (found) {
+        found.classList.add('locked-target');
+        lockedTargetElement = found;
+        document.getElementById('hud-lock').classList.add('active');
+
+        if (lastLockedElement !== found) {
+          sound.playLockDing();
+          lastLockedElement = found;
+        }
+      } else {
+        lockedTargetElement = null;
+        lastLockedElement = null;
+        document.getElementById('hud-lock').classList.remove('active');
+      }
+    }
+
+    /* Render Crosshair Canvas Overlay */
+    function renderAROverlay() {
+      ctx.clearRect(0, 0, arCanvas.width, arCanvas.height);
+
+      if (arModeActive) {
+        // Draw Reticle Crosshair
+        ctx.save();
+        ctx.translate(cursorX, cursorY);
+
+        ctx.strokeStyle = lockedTargetElement ? '#00e5ff' : '#f39c12';
+        ctx.lineWidth = 3;
+
+        ctx.beginPath();
+        ctx.arc(0, 0, 22, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(0, 0, 6, 0, Math.PI * 2);
+        ctx.fillStyle = lockedTargetElement ? '#00e5ff' : '#e74c3c';
+        ctx.fill();
+
+        // Cross lines
+        ctx.beginPath();
+        ctx.moveTo(-30, 0); ctx.lineTo(-12, 0);
+        ctx.moveTo(12, 0); ctx.lineTo(30, 0);
+        ctx.moveTo(0, -30); ctx.lineTo(0, -12);
+        ctx.moveTo(0, 12); ctx.lineTo(0, 30);
+        ctx.stroke();
+
+        ctx.restore();
+      }
+
+      requestAnimationFrame(renderAROverlay);
+    }
+
+    /* ==========================================
+       7. WIN SCREEN & RESET
+       ========================================== */
+    function showWinScreen() {
+      sound.playFanfare();
+      if (typeof confetti === 'function') {
+        confetti({ particleCount: 120, spread: 100, origin: { y: 0.5 } });
+      }
+
+      document.getElementById('res-score').innerText = score;
+      document.getElementById('res-correct').innerText = `${correctCount} / ${shuffledQuestions.length}`;
+      document.getElementById('res-combo').innerText = `x${maxCombo}`;
+      
+      const acc = Math.round((correctCount / shuffledQuestions.length) * 100);
+      document.getElementById('res-accuracy').innerText = `${acc}%`;
+
+      const starsBox = document.getElementById('stars-box');
+      let starsCount = 1;
+      if (acc >= 50) starsCount = 2;
+      if (acc >= 80) starsCount = 3;
+
+      starsBox.innerHTML = `
+        <span class="star ${starsCount >= 1 ? 'gold' : ''}">★</span>
+        <span class="star ${starsCount >= 2 ? 'gold' : ''}">★</span>
+        <span class="star ${starsCount >= 3 ? 'gold' : ''}">★</span>
+      `;
+
+      document.getElementById('win-modal').classList.remove('hidden');
+    }
+
+    /* Event Listeners for Modals */
+    document.getElementById('btn-start-ar').addEventListener('click', startARMode);
+    document.getElementById('btn-start-mouse').addEventListener('click', startMouseMode);
+    document.getElementById('btn-restart').addEventListener('click', () => {
+      document.getElementById('win-modal').classList.add('hidden');
+      initGame();
+    });
+  </script>
+</body>
+</html>
